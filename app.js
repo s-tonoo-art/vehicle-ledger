@@ -346,7 +346,7 @@ async function saveRecord() {
   // ▼ 新規追加: Google Apps Script経由でスプレッドシートへ送信
   const btn = $('submitBtn');
   btn.disabled = true;
-  btn.textContent = '$D83D$DD04 送信中...';
+ btn.textContent = '?? 送信中...';
   
   try {
     // $D83D$DCA1 Content-Type: text/plain で送信し、CORSのPreflightエラーを回避する
@@ -425,21 +425,28 @@ async function runOcr(imageFile, targetInputId) {
 }
 
 // ── Google Sheets連携 ──
+/ 420行目：URLを確認（末尾にキャッシュ対策を追加）
 const GAS_URL = 'https://script.google.com/a/macros/jt-e.jp/s/AKfycbxKCtNSP0fonFnIBjs3BUCoKcYtiFsw2ohXQHqFGi0UgHohrEm6seV4luG2BnCv-SHc/exec';
-
 async function loadMasterFromSheets() {
+  console.log('?? GASからマスターデータを取得開始...');
   try {
-    const res  = await fetch(GAS_URL);
+    // ?? キャッシュ対策としてURLの末尾に時間を付与
+    const res  = await fetch(GAS_URL + '?t=' + Date.now());
+    if (!res.ok) throw new Error('Network response was not ok');
+    
     const data = await res.json();
-    const master = loadMaster();         // ローカルをベースに
-    if (data.branches) master.branches = data.branches;
-    if (data.vehicles) master.vehicles = data.vehicles;
-    if (data.drivers)  master.drivers  = data.drivers;
-    if (data.checkers) master.checkers = data.checkers;
-    saveMaster(master);                  // ローカルに上書き保存
+    console.log('? GASからの取得に成功:', data);
+    
+    const master = loadMaster();
+    if (data.branches && data.branches.length > 0) master.branches = data.branches;
+    if (data.vehicles && data.vehicles.length > 0) master.vehicles = data.vehicles;
+    if (data.drivers  && data.drivers.length  > 0) master.drivers  = data.drivers;
+    if (data.checkers && data.checkers.length > 0) master.checkers = data.checkers;
+    
+    saveMaster(master);
     return master;
   } catch (e) {
-    console.warn('Sheets 読込み失敗、ローカルデータを使用:', e);
+    console.error('? GASの読み込みに失敗しました。ローカルデータを使用します:', e);
     return loadMaster();
   }
 }
