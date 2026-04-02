@@ -7,6 +7,7 @@
 
 // ── マスターデータ（ここに追加・変更可能）──
 const MASTER = {
+  branches: ['東京本社', '大阪支店', '名古屋支店', '福岡支店', '札幌支店', 'その他（手入力）'],
   vehicles: ['品川300あ1234', '品川300あ5678', '品川300い1111', 'その他（手入力）'],
   drivers:  ['山田 太郎', '鈴木 花子', '田中 一郎', '佐藤 美咲', 'その他（手入力）'],
   checkers: ['管理者A', '管理者B', '主任C', 'その他（手入力）'],
@@ -42,7 +43,12 @@ function loadMaster() {
     const m = JSON.parse(localStorage.getItem(MASTER_KEY));
     if (m) return m;
   } catch {}
-  return { vehicles: [...MASTER.vehicles], drivers: [...MASTER.drivers], checkers: [...MASTER.checkers] };
+  return {
+    branches: [...MASTER.branches],
+    vehicles: [...MASTER.vehicles],
+    drivers:  [...MASTER.drivers],
+    checkers: [...MASTER.checkers],
+  };
 }
 function saveMaster(m) {
   localStorage.setItem(MASTER_KEY, JSON.stringify(m));
@@ -134,6 +140,17 @@ function applyLastRecord() {
   const records = loadRecords();
   if (records.length === 0) return;
   const last = records[records.length - 1];
+  // 支店名
+  if (last.branch) {
+    const sel = $('branch');
+    if ([...sel.options].some(o => o.value === last.branch)) {
+      sel.value = last.branch;
+    } else {
+      sel.value = 'その他（手入力）';
+      $('branchCustom').value = last.branch;
+      $('branchCustomWrap').style.display = '';
+    }
+  }
   // 車両番号
   if (last.vehicle) {
     const sel = $('vehicle');
@@ -207,6 +224,11 @@ function updateProgress() {
 }
 
 // ── 値取得ヘルパー ──
+function getBranch() {
+  const v = $('branch').value;
+  if (v === 'その他（手入力）') return $('branchCustom').value.trim();
+  return v;
+}
 function getVehicle() {
   const v = $('vehicle').value;
   if (v === 'その他（手入力）') return $('vehicleCustom').value.trim();
@@ -226,6 +248,7 @@ function getChecker() {
 // ── バリデーション ──
 function validate() {
   const errors = [];
+  if (!getBranch())   errors.push('支店名を選択または入力してください。');
   if (!getVehicle())  errors.push('車両番号を選択または入力してください。');
   if (!getDriver())   errors.push('運転者名を選択または入力してください。');
   if (!$('departure').value) errors.push('出発時刻を入力してください。');
@@ -264,6 +287,7 @@ function saveRecord() {
     id:        Date.now().toString(),
     savedAt:   new Date().toISOString(),
     date:      $('date').value,
+    branch:    getBranch(),
     vehicle:   getVehicle(),
     driver:    getDriver(),
     departure: $('departure').value,
@@ -281,10 +305,10 @@ function saveRecord() {
 
   // マスター更新（新規値を追加）
   const master = loadMaster();
-  ['vehicles', 'drivers', 'checkers'].forEach((mKey, i) => {
-    const val = [record.vehicle, record.driver, record.checker][i];
+  ['branches', 'vehicles', 'drivers', 'checkers'].forEach((mKey, i) => {
+    const val = [record.branch, record.vehicle, record.driver, record.checker][i];
     if (val && !master[mKey].includes(val)) {
-      master[mKey].splice(master[mKey].length - 1, 0, val); // 「その他」の前に挿入
+      master[mKey].splice(master[mKey].length - 1, 0, val);
     }
   });
   saveMaster(master);
@@ -315,6 +339,36 @@ function onSelectChange(selId, wrapId) {
   });
 }
 
+// ── OCR: カメラ → 数値読取 ──
+function showOcrLoading(visible) {
+  $('ocrOverlay').style.display = visible ? 'flex' : 'none';
+}
+
+async function runOcr(imageFile, targetInputId) {
+  showOcrLoading(true);
+  try {
+    const worker = await Tesseract.createWorker('eng');
+    await worker.setParameters({ tessedit_char_whitelist: '0123456789' });
+    const { data: { text } } = await worker.recognize(imageFile);
+    await worker.terminate();
+    // 数字列のうち最長（オドメーター値）を抽出
+    const matches = text.match(/\d+/g);
+    if (matches && matches.length > 0) {
+      const num = matches.reduce((a, b) => a.length >= b.length ? a : b);
+      $(targetInputId).value = num;
+      updateOdo();
+      showToast(`📷 OCR読取: ${num} km`, 'success');
+    } else {
+      showToast('⚠️ 数値を読み取れませんでした。手動入力してください。', 'error');
+    }
+  } catch (err) {
+    console.error('OCR error:', err);
+    showToast('⚠️ OCRエラー。手動入力してください。', 'error');
+  } finally {
+    showOcrLoading(false);
+  }
+}
+
 // ── 初期化 ──
 function init() {
   // 日付セット
@@ -324,14 +378,16 @@ function init() {
 
   // マスターからセレクト構築
   const master = loadMaster();
+  buildSelect($('branch'),   master.branches);
   buildSelect($('vehicle'),  master.vehicles);
   buildSelect($('driver'),   master.drivers);
   buildSelect($('checker'),  master.checkers);
 
   // 選択→手入力切替
-  onSelectChange('vehicle', 'vehicleCustomWrap');
-  onSelectChange('driver',  'driverCustomWrap');
-  onSelectChange('checker', 'checkerCustomWrap');
+  onSelectChange('branch',   'branchCustomWrap');
+  onSelectChange('vehicle',  'vehicleCustomWrap');
+  onSelectChange('driver',   'driverCustomWrap');
+  onSelectChange('checker',  'checkerCustomWrap');
 
   // 点検カード生成
   buildCheckList();
@@ -342,12 +398,24 @@ function init() {
   $('alcoholVal').addEventListener('input', updateAlcohol);
   $('departure').addEventListener('change', updateProgress);
   $('arrival').addEventListener('change', updateProgress);
+  $('branch').addEventListener('change', updateProgress);
   $('vehicle').addEventListener('change', updateProgress);
   $('driver').addEventListener('change', updateProgress);
   $('checker').addEventListener('change', updateProgress);
+  $('branchCustom').addEventListener('input', updateProgress);
   $('vehicleCustom').addEventListener('input', updateProgress);
   $('driverCustom').addEventListener('input', updateProgress);
   $('checkerCustom').addEventListener('input', updateProgress);
+
+  // カメラOCRボタン
+  $('btnCameraStart').addEventListener('click', () => $('cameraStart').click());
+  $('btnCameraEnd').addEventListener('click',   () => $('cameraEnd').click());
+  $('cameraStart').addEventListener('change', e => {
+    if (e.target.files[0]) runOcr(e.target.files[0], 'odoStart');
+  });
+  $('cameraEnd').addEventListener('change', e => {
+    if (e.target.files[0]) runOcr(e.target.files[0], 'odoEnd');
+  });
 
   $('submitBtn').addEventListener('click', saveRecord);
 
@@ -357,3 +425,4 @@ function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+

@@ -62,13 +62,14 @@ function createRecordCard(record) {
   const dateStr = record.date ? record.date.replace(/-/g, '/') : '日付未設定';
   const timeStr = record.departure ? `出発 ${record.departure}` : '';
   const distStr = record.odoDiff   ? `${record.odoDiff.toLocaleString()} km走行` : '';
+  const branchStr = record.branch ? `🏢 ${escHtml(record.branch)}` : '';
 
   div.innerHTML = `
     <div class="record-card-top">
       <span class="record-vehicle">${escHtml(record.vehicle || '---')}</span>
       <span class="record-date">${dateStr}</span>
     </div>
-    <div class="record-driver">👤 ${escHtml(record.driver || '---')}　${timeStr}　${distStr}</div>
+    <div class="record-driver">${branchStr}${branchStr ? '　' : ''}👤 ${escHtml(record.driver || '---')}　${timeStr}　${distStr}</div>
     <div class="record-badges">
       <span class="badge badge-ok">OK: ${cnt.ok}</span>
       <span class="badge badge-ng">NG: ${cnt.ng}</span>
@@ -171,7 +172,7 @@ function exportCsv() {
 
   const checkKeys = Object.keys(CHECK_LABELS);
   const headers = [
-    '記録ID', '保存日時', '点検日', '車両番号', '運転者', '出発時刻', '帰着時刻',
+    '記録ID', '保存日時', '点検日', '支店名', '車両番号', '運転者', '出発時刻', '帰着時刻',
     '出発時走行距離(km)', '帰着時走行距離(km)', '走行距離(km)',
     ...checkKeys.flatMap(k => [`${CHECK_LABELS[k]}結果`, `${CHECK_LABELS[k]}コメント`]),
     'アルコール値(mg/L)', 'アルコール警告', '確認者', '確認時刻', '備考',
@@ -186,7 +187,7 @@ function exportCsv() {
       ];
     });
     return [
-      r.id, r.savedAt, r.date, r.vehicle, r.driver,
+      r.id, r.savedAt, r.date, r.branch || '', r.vehicle, r.driver,
       r.departure, r.arrival,
       r.odoStart, r.odoEnd, r.odoDiff,
       ...checkCols,
@@ -224,6 +225,7 @@ function openModal(record) {
   let html = `
     <h2 style="font-size:1rem;margin-bottom:16px;color:var(--primary)">📋 点検詳細</h2>
     <div class="modal-row"><span class="modal-key">点検日</span><span class="modal-val">${escHtml(record.date||'')}</span></div>
+    ${record.branch ? `<div class="modal-row"><span class="modal-key">支店名</span><span class="modal-val">${escHtml(record.branch)}</span></div>` : ''}
     <div class="modal-row"><span class="modal-key">車両番号</span><span class="modal-val">${escHtml(record.vehicle||'')}</span></div>
     <div class="modal-row"><span class="modal-key">運転者</span><span class="modal-val">${escHtml(record.driver||'')}</span></div>
     <div class="modal-row"><span class="modal-key">出発 / 帰着</span><span class="modal-val">${escHtml(record.departure||'')} / ${escHtml(record.arrival||'')}</span></div>

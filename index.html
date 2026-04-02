@@ -7,6 +7,7 @@
   <meta name="description" content="スマートフォン用車両日常点検アプリ。素早く正確に点検記録を入力できます。">
   <meta name="theme-color" content="#0f0c29">
   <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 
@@ -35,6 +36,16 @@
       <div class="field-group">
         <label for="date">日付</label>
         <input type="date" id="date" class="field-readonly" readonly>
+      </div>
+      <div class="field-group">
+        <label for="branch">支店名</label>
+        <select id="branch">
+          <option value="">-- 選択してください --</option>
+        </select>
+      </div>
+      <div class="field-group" id="branchCustomWrap" style="display:none">
+        <label for="branchCustom">支店名（手入力）</label>
+        <input type="text" id="branchCustom" placeholder="支店名を入力">
       </div>
       <div class="field-group">
         <label for="vehicle">車両番号</label>
@@ -76,15 +87,21 @@
       <div class="section-title">走行情報</div>
     </div>
     <div class="section-body">
-      <div class="field-row">
-        <div class="field-group">
-          <label for="odoStart">出発時 走行距離 (km)</label>
+      <div class="field-group">
+        <label for="odoStart">出発時 走行距離 (km)</label>
+        <div class="odo-row">
           <input type="number" id="odoStart" inputmode="numeric" placeholder="0" min="0">
+          <button class="btn-camera" id="btnCameraStart" type="button" title="カメラでOCR読取">📷</button>
         </div>
-        <div class="field-group">
-          <label for="odoEnd">帰着時 走行距離 (km)</label>
+        <input type="file" id="cameraStart" accept="image/*" capture="environment" style="display:none">
+      </div>
+      <div class="field-group">
+        <label for="odoEnd">帰着時 走行距離 (km)</label>
+        <div class="odo-row">
           <input type="number" id="odoEnd" inputmode="numeric" placeholder="0" min="0">
+          <button class="btn-camera" id="btnCameraEnd" type="button" title="カメラでOCR読取">📷</button>
         </div>
+        <input type="file" id="cameraEnd" accept="image/*" capture="environment" style="display:none">
       </div>
       <div class="field-group">
         <label>走行距離（自動計算）</label>
@@ -160,6 +177,12 @@
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
+
+<!-- OCR Loading Overlay -->
+<div class="ocr-overlay" id="ocrOverlay">
+  <div class="ocr-spinner">📷</div>
+  <div class="ocr-label">オドメーターを解析中...</div>
+</div>
 
 <script src="app.js"></script>
 </body>
