@@ -71,6 +71,7 @@ function createRecordCard(record) {
     </div>
     <div class="record-driver">${branchStr}${branchStr ? '　' : ''}👤 ${escHtml(record.driver || '---')}　${timeStr}　${distStr}</div>
     <div class="record-badges">
+      ${record.status === '稼働中' ? '<span class="badge" style="background:#f59e0b;color:white">🟡 稼働中</span>' : '<span class="badge" style="background:#10b981;color:white">✅ 完了</span>'}
       <span class="badge badge-ok">OK: ${cnt.ok}</span>
       <span class="badge badge-ng">NG: ${cnt.ng}</span>
       ${cnt.skip > 0 ? `<span class="badge badge-skip">未実施: ${cnt.skip}</span>` : ''}
@@ -243,12 +244,28 @@ function openModal(record) {
   const alcoClass = record.alcoholAlert ? 'ng' : 'ok';
   html += `
     <div style="margin:14px 0 6px;font-size:0.78rem;color:var(--text-sub);text-transform:uppercase;letter-spacing:.05em;font-weight:700;">アルコール</div>
-    <div class="modal-row"><span class="modal-key">測定値</span><span class="modal-val ${alcoClass}">${record.alcohol || 0} mg/L${record.alcoholAlert ? ' ⚠️ 警告' : ''}</span></div>
     <div class="modal-row"><span class="modal-key">確認者</span><span class="modal-val">${escHtml(record.checker||'')} ${escHtml(record.checkedAt||'')}</span></div>
     ${record.remarks ? `<div class="modal-row"><span class="modal-key">備考</span><span class="modal-val">${escHtml(record.remarks)}</span></div>` : ''}
+    
+    ${record.status === '稼働中' ? `
+      <div style="margin-top:20px; text-align:center;">
+        <button id="resumeBtn" class="btn-primary" style="width:100%; padding:12px; border-radius:8px; background:var(--primary); color:white; border:none; font-weight:bold; cursor:pointer;">
+          🚗 帰着入力を開始する
+        </button>
+      </div>
+    ` : ''}
   `;
 
   content.innerHTML = html;
+  
+  const resumeBtn = $('resumeBtn');
+  if (resumeBtn) {
+    resumeBtn.onclick = () => {
+      sessionStorage.setItem('updateRecordId', record.id);
+      window.location.href = 'index.html';
+    };
+  }
+
   $('modalOverlay').classList.add('open');
 }
 

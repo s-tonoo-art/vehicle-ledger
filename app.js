@@ -306,7 +306,14 @@ async function saveRecord() {
     checker:   getChecker(),
     checkedAt: $('checkedAt').value,
     remarks:   $('remarks').value.trim(),
+    status:    $('arrival').value && $('odoEnd').value ? '完了' : '稼働中', // 追加: ステータス判定
   };
+  
+  // Update Mode判定
+  const isUpdate = sessionStorage.getItem('updateRecordId');
+  if (isUpdate) {
+    record.id = isUpdate; // 既存IDを引き継ぐ
+  }
 
   // マスター更新（新規値を追加）
   const master = loadMaster();
@@ -319,7 +326,13 @@ async function saveRecord() {
   saveMaster(master);
 
   const records = loadRecords();
-  records.push(record);
+  if (isUpdate) {
+    const idx = records.findIndex(r => r.id === isUpdate);
+    if (idx !== -1) records[idx] = record;
+    sessionStorage.removeItem('updateRecordId');
+  } else {
+    records.push(record);
+  }
   saveRecords(records);
 
   // ▼ 新規追加: Google Apps Script経由でスプレッドシートへ送信
@@ -329,10 +342,11 @@ async function saveRecord() {
   
   try {
     // 💡 Content-Type: text/plain で送信し、CORSのPreflightエラーを回避する
+    const payload = { action: isUpdate ? 'update' : 'create', data: record };
     await fetch(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(record)
+      body: JSON.stringify(payload)
     });
     showToast('✅ スプレッドシートにも保存しました！', 'success');
   } catch (err) {
@@ -369,10 +383,21 @@ function showOcrLoading(visible) {
 async function runOcr(imageFile, targetInputId) {
   showOcrLoading(true);
   try {
-    const worker = await Tesseract.createWorker('eng');
-    await worker.setParameters({ tessedit_char_whitelist: '0123456789' });
-    const { data: { text } } = await worker.recognize(imageFile);
-    await worker.terminate();
+    const workerPromise = (async () => {
+      const worker = await Tesseract.createWorker('eng');
+      await worker.setParameters({ tessedit_char_whitelist: '0123456789' });
+      const res = await worker.recognize(imageFile);
+      await worker.terminate();
+      return res;
+    })();
+
+    // 15秒のタイムアウト
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('TIMEOUT')), 15000)
+    );
+
+    const { data: { text } } = await Promise.race([workerPromise, timeoutPromise]);
+
     // 数字列のうち最長（オドメーター値）を抽出
     const matches = text.match(/\d+/g);
     if (matches && matches.length > 0) {
@@ -411,8 +436,37 @@ async function loadMasterFromSheets() {
   }
 }
 
+// ── フォームリセット処理 ──
+function resetForm() {
+  $('submitBtn').disabled = false;
+  $('submitBtn').textContent = '送信';
+  $('departure').value = '';
+  $('arrival').value = '';
+  $('odoStart').value = '';
+  $('odoEnd').value = '';
+  $('odoCalc').value = '--- km';
+  $('alcoholVal').value = '';
+  $('remarks').value = '';
+  
+  CHECK_ITEMS.forEach(item => {
+    checkState[item.key] = null;
+    $(`card-${item.key}`).classList.remove('is-ok', 'is-ng');
+    $(`btn-${item.key}-ok`).className = 'btn-check';
+    $(`btn-${item.key}-ng`).className = 'btn-check';
+    $(`btn-${item.key}-skip`).className = 'btn-check';
+    $(`ngComment-${item.key}`).classList.remove('visible');
+    $(`ngText-${item.key}`).value = '';
+  });
+  updateProgress();
+}
+
 // ── 初期化 ──
 async function init() {
+  // ページが表示されるたびにリセット（Safari等のキャッシュ戻り対策）
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) resetForm();
+  });
+  
   // 日付セット
   const today = new Date();
   const pad = n => String(n).padStart(2, '0');
@@ -449,7 +503,7 @@ async function init() {
   $('driverCustom').addEventListener('input', updateProgress);
   $('checkerCustom').addEventListener('input', updateProgress);
 
-  // カメラOCRイベント（HTML側でネイティブ起動するため、changeイベントのみリッスン）
+  // カメラOCRイベント
   $('cameraStart').addEventListener('change', e => {
     if (e.target.files[0]) runOcr(e.target.files[0], 'odoStart');
   });
@@ -459,8 +513,53 @@ async function init() {
 
   $('submitBtn').addEventListener('click', saveRecord);
 
-  // 前回データ引継ぎ
-  applyLastRecord();
+  // Updateモードの判定（履歴から再入力に来た場合）
+  const updateId = sessionStorage.getItem('updateRecordId');
+  if (updateId) {
+    const rawRecs = loadRecords();
+    const target = rawRecs.find(r => r.id === updateId);
+    if (target) {
+      // 復元処理
+      $('date').value = target.date || '';
+      // セレクトボックス系の復元
+      const safeSetSelect = (id, val, wrapId) => {
+        const sel = $(id);
+        if ([...sel.options].some(o => o.value === val)) {
+           sel.value = val;
+        } else {
+           sel.value = 'その他（手入力）';
+           $(id + 'Custom').value = val;
+           $(wrapId).style.display = '';
+        }
+      };
+      safeSetSelect('branch', target.branch, 'branchCustomWrap');
+      safeSetSelect('vehicle', target.vehicle, 'vehicleCustomWrap');
+      safeSetSelect('driver', target.driver, 'driverCustomWrap');
+      safeSetSelect('checker', target.checker, 'checkerCustomWrap');
+      
+      $('departure').value = target.departure || '';
+      $('odoStart').value = target.odoStart || '';
+      $('alcoholVal').value = target.alcohol || '';
+      $('checkedAt').value = target.checkedAt || '';
+      $('remarks').value = target.remarks || '';
+      
+      // 点検チェック状態の復元
+      if (target.checks) {
+        Object.keys(target.checks).forEach(k => {
+          setCheckState(k, target.checks[k].result);
+          if (target.checks[k].result === 'ng') {
+            $(`ngText-${k}`).value = target.checks[k].comment;
+          }
+        });
+      }
+      // 送信ボタンのラベル変更
+      $('submitBtn').textContent = '✅ 帰着報告を送信（更新）';
+    }
+  } else {
+    // 新規時は前回データ引継ぎ
+    applyLastRecord();
+  }
+
   updateProgress();
 }
 
