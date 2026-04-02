@@ -14,15 +14,15 @@ const MASTER = {
 };
 
 const CHECK_ITEMS = [
-  { key: 'brake',    label: 'ブレーキ',      icon: '🛑' },
-  { key: 'tire',     label: 'タイヤ状態',    icon: '🔄' },
-  { key: 'lights',   label: '灯火類',        icon: '💡' },
-  { key: 'wiper',    label: 'ワイパー',      icon: '🌧️' },
-  { key: 'mirror',   label: 'バックミラー',  icon: '🪞' },
-  { key: 'engine',   label: 'エンジン始動',  icon: '🔧' },
-  { key: 'noise',    label: '異音有無',      icon: '🔊' },
-  { key: 'fuel',     label: '燃料残量',      icon: '⛽' },
-  { key: 'other',    label: 'その他',        icon: '📝' },
+  { key: 'brake',    label: 'ブレーキ',      icon: '$D83D$DED1' },
+  { key: 'tire',     label: 'タイヤ状態',    icon: '$D83D$DD04' },
+  { key: 'lights',   label: '灯火類',        icon: '$D83D$DCA1' },
+  { key: 'wiper',    label: 'ワイパー',      icon: '$D83C$DF27$FE0F' },
+  { key: 'mirror',   label: 'バックミラー',  icon: '$D83E$DE9E' },
+  { key: 'engine',   label: 'エンジン始動',  icon: '$D83D$DD27' },
+  { key: 'noise',    label: '異音有無',      icon: '$D83D$DD0A' },
+  { key: 'fuel',     label: '燃料残量',      icon: '$26FD' },
+  { key: 'other',    label: 'その他',        icon: '$D83D$DCDD' },
 ];
 
 const TOTAL_SECTIONS = 5;
@@ -62,16 +62,24 @@ function saveMaster(m) {
 const $ = id => document.getElementById(id);
 
 // ── セレクト生成 ──
-function buildSelect(selectEl, items, allowCustom) {
+function buildSelect(selectEl, items) {
   selectEl.innerHTML = '<option value="">-- 選択してください --</option>';
-  if (!Array.isArray(items)) return; // 壊れたデータが来た場合のエラー停止を防止
+  if (!Array.isArray(items)) return;
+  
+  // スプレッドシートからのデータを入れる
   items.forEach(item => {
+    if (item === 'その他（手入力）') return; // 重複防止
     const opt = document.createElement('option');
-    opt.value = item;
-    opt.textContent = item;
+    opt.value = opt.textContent = item;
     selectEl.appendChild(opt);
   });
+  
+  // 最後に必ず「その他」を追加
+  const other = document.createElement('option');
+  other.value = other.textContent = 'その他（手入力）';
+  selectEl.appendChild(other);
 }
+
 
 // ── 点検カード生成 ──
 function buildCheckList() {
@@ -84,12 +92,12 @@ function buildCheckList() {
     card.innerHTML = `
       <div class="check-item-name">${item.icon} ${item.label}</div>
       <div class="check-buttons">
-        <button class="btn-check" data-key="${item.key}" data-val="ok"   id="btn-${item.key}-ok">✅ OK</button>
-        <button class="btn-check" data-key="${item.key}" data-val="ng"   id="btn-${item.key}-ng">❌ NG</button>
-        <button class="btn-check" data-key="${item.key}" data-val="skip" id="btn-${item.key}-skip">— 未実施</button>
+        <button class="btn-check" data-key="${item.key}" data-val="ok"   id="btn-${item.key}-ok">$2705 OK</button>
+        <button class="btn-check" data-key="${item.key}" data-val="ng"   id="btn-${item.key}-ng">$274C NG</button>
+        <button class="btn-check" data-key="${item.key}" data-val="skip" id="btn-${item.key}-skip">$2014 未実施</button>
       </div>
       <div class="ng-comment" id="ngComment-${item.key}">
-        <label>⚠️ NG理由（必須）</label>
+        <label>$26A0$FE0F NG理由（必須）</label>
         <textarea id="ngText-${item.key}" placeholder="${item.label}のNG内容を入力してください"></textarea>
       </div>
     `;
@@ -274,7 +282,7 @@ function validate() {
 async function saveRecord() {
   const errors = validate();
   if (errors.length > 0) {
-    showToast('⚠️ ' + errors[0], 'error');
+    showToast('$26A0$FE0F ' + errors[0], 'error');
     return;
   }
 
@@ -338,20 +346,20 @@ async function saveRecord() {
   // ▼ 新規追加: Google Apps Script経由でスプレッドシートへ送信
   const btn = $('submitBtn');
   btn.disabled = true;
-  btn.textContent = '🔄 送信中...';
+  btn.textContent = '$D83D$DD04 送信中...';
   
   try {
-    // 💡 Content-Type: text/plain で送信し、CORSのPreflightエラーを回避する
+    // $D83D$DCA1 Content-Type: text/plain で送信し、CORSのPreflightエラーを回避する
     const payload = { action: isUpdate ? 'update' : 'create', data: record };
     await fetch(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(payload)
     });
-    showToast('✅ スプレッドシートにも保存しました！', 'success');
+    showToast('$2705 スプレッドシートにも保存しました！', 'success');
   } catch (err) {
     console.error('GAS POST Error:', err);
-    showToast('⚠️ ネットワークエラーのため端末内にのみ保存しました', 'error');
+    showToast('$26A0$FE0F ネットワークエラーのため端末内にのみ保存しました', 'error');
   }
 
   setTimeout(() => { window.location.href = 'history.html'; }, 1200);
@@ -404,20 +412,20 @@ async function runOcr(imageFile, targetInputId) {
       const num = matches.reduce((a, b) => a.length >= b.length ? a : b);
       $(targetInputId).value = num;
       updateOdo();
-      showToast(`📷 OCR読取: ${num} km`, 'success');
+      showToast(`$D83D$DCF7 OCR読取: ${num} km`, 'success');
     } else {
-      showToast('⚠️ 数値を読み取れませんでした。手動入力してください。', 'error');
+      showToast('$26A0$FE0F 数値を読み取れませんでした。手動入力してください。', 'error');
     }
   } catch (err) {
     console.error('OCR error:', err);
-    showToast('⚠️ OCRエラー。手動入力してください。', 'error');
+    showToast('$26A0$FE0F OCRエラー。手動入力してください。', 'error');
   } finally {
     showOcrLoading(false);
   }
 }
 
 // ── Google Sheets連携 ──
-const GAS_URL = 'https://script.google.com/a/macros/jt-e.jp/s/AKfycbzOZlcXWtvMJiveI-Ou950AkCknmyeMmTsaPfmEzixDLX5zCZkndIK6OCGB5-ITMUHU/exec';
+const GAS_URL = 'https://script.google.com/a/macros/jt-e.jp/s/AKfycbxKCtNSP0fonFnIBjs3BUCoKcYtiFsw2ohXQHqFGi0UgHohrEm6seV4luG2BnCv-SHc/exec';
 
 async function loadMasterFromSheets() {
   try {
@@ -553,7 +561,7 @@ async function init() {
         });
       }
       // 送信ボタンのラベル変更
-      $('submitBtn').textContent = '✅ 帰着報告を送信（更新）';
+      $('submitBtn').textContent = '$2705 帰着報告を送信（更新）';
     }
   } else {
     // 新規時は前回データ引継ぎ
