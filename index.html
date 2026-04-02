@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>車両点検 | 入力</title>
+  <meta name="description" content="スマートフォン用車両日常点検アプリ。素早く正確に点検記録を入力できます。">
+  <meta name="theme-color" content="#0f0c29">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <h1><span class="icon">🚗</span> 車両点検</h1>
+  <a href="history.html" class="nav-link">📋 履歴</a>
+</header>
+
+<div class="container">
+
+  <!-- Progress -->
+  <div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill" style="width:0%"></div>
+    </div>
+    <div class="progress-label" id="progressLabel">0 / 5 セクション完了</div>
+  </div>
+
+  <!-- ① 基本情報 -->
+  <div class="section-card" id="sec-basic">
+    <div class="section-header">
+      <div class="section-icon">📋</div>
+      <div class="section-title">基本情報</div>
+    </div>
+    <div class="section-body">
+      <div class="field-group">
+        <label for="date">日付</label>
+        <input type="date" id="date" class="field-readonly" readonly>
+      </div>
+      <div class="field-group">
+        <label for="vehicle">車両番号</label>
+        <select id="vehicle">
+          <option value="">-- 選択してください --</option>
+        </select>
+      </div>
+      <div class="field-group" id="vehicleCustomWrap" style="display:none">
+        <label for="vehicleCustom">車両番号（手入力）</label>
+        <input type="text" id="vehicleCustom" placeholder="例：品川 300 あ 1234">
+      </div>
+      <div class="field-group">
+        <label for="driver">運転者名</label>
+        <select id="driver">
+          <option value="">-- 選択してください --</option>
+        </select>
+      </div>
+      <div class="field-group" id="driverCustomWrap" style="display:none">
+        <label for="driverCustom">運転者名（手入力）</label>
+        <input type="text" id="driverCustom" placeholder="氏名を入力">
+      </div>
+      <div class="field-row">
+        <div class="field-group">
+          <label for="departure">出発時刻</label>
+          <input type="time" id="departure" placeholder="--:--">
+        </div>
+        <div class="field-group">
+          <label for="arrival">帰着時刻</label>
+          <input type="time" id="arrival" placeholder="--:--">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② 走行情報 -->
+  <div class="section-card" id="sec-mileage">
+    <div class="section-header">
+      <div class="section-icon">🛣️</div>
+      <div class="section-title">走行情報</div>
+    </div>
+    <div class="section-body">
+      <div class="field-row">
+        <div class="field-group">
+          <label for="odoStart">出発時 走行距離 (km)</label>
+          <input type="number" id="odoStart" inputmode="numeric" placeholder="0" min="0">
+        </div>
+        <div class="field-group">
+          <label for="odoEnd">帰着時 走行距離 (km)</label>
+          <input type="number" id="odoEnd" inputmode="numeric" placeholder="0" min="0">
+        </div>
+      </div>
+      <div class="field-group">
+        <label>走行距離（自動計算）</label>
+        <input type="text" id="odoCalc" class="field-readonly" readonly placeholder="0 km">
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ 点検項目 -->
+  <div class="section-card" id="sec-checks">
+    <div class="section-header">
+      <div class="section-icon">✅</div>
+      <div class="section-title">点検項目</div>
+    </div>
+    <div class="section-body" id="checkList">
+      <!-- JS で生成 -->
+    </div>
+  </div>
+
+  <!-- ④ アルコールチェック -->
+  <div class="section-card" id="sec-alcohol">
+    <div class="section-header">
+      <div class="section-icon">🍃</div>
+      <div class="section-title">アルコールチェック</div>
+    </div>
+    <div class="section-body">
+      <div class="field-group">
+        <label for="alcoholVal">測定値</label>
+        <div class="alcohol-value-wrap">
+          <input type="number" id="alcoholVal" inputmode="decimal"
+                 step="0.01" min="0" max="9.99" placeholder="0.00">
+          <span class="alcohol-unit">mg/L</span>
+        </div>
+      </div>
+      <div class="alcohol-warning" id="alcoholWarning">
+        ⚠️ アルコール検知！（基準値 0.15 以上）出発を停止してください。
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑤ 確認 -->
+  <div class="section-card" id="sec-confirm">
+    <div class="section-header">
+      <div class="section-icon">👤</div>
+      <div class="section-title">確認</div>
+    </div>
+    <div class="section-body">
+      <div class="field-group">
+        <label for="checker">確認者名</label>
+        <select id="checker">
+          <option value="">-- 選択してください --</option>
+        </select>
+      </div>
+      <div class="field-group" id="checkerCustomWrap" style="display:none">
+        <label for="checkerCustom">確認者名（手入力）</label>
+        <input type="text" id="checkerCustom" placeholder="確認者氏名">
+      </div>
+      <div class="field-group">
+        <label for="checkedAt">確認時刻</label>
+        <input type="time" id="checkedAt">
+      </div>
+      <div class="field-group">
+        <label for="remarks">備考</label>
+        <textarea id="remarks" placeholder="特記事項があれば入力（任意）"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Submit -->
+  <button class="btn-submit" id="submitBtn">💾 点検記録を保存する</button>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

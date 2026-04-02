@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>車両点検 | 履歴</title>
+  <meta name="description" content="車両点検履歴の一覧表示・NG抽出・日別集計・CSV出力">
+  <meta name="theme-color" content="#0f0c29">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <h1><span class="icon">📋</span> 点検履歴</h1>
+  <a href="index.html" class="nav-link">✏️ 新規入力</a>
+</header>
+
+<!-- タブバー -->
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="tab-list"    id="tabBtn-list">📋 一覧</button>
+  <button class="tab-btn"        data-tab="tab-ng"      id="tabBtn-ng">❌ NG</button>
+  <button class="tab-btn"        data-tab="tab-agg"     id="tabBtn-agg">📊 集計</button>
+  <button class="tab-btn"        data-tab="tab-export"  id="tabBtn-export">📥 出力</button>
+</div>
+
+<!-- ① 一覧タブ -->
+<div class="tab-panel active" id="tab-list">
+  <div class="filter-row">
+    <select id="filterVehicle">
+      <option value="">全車両</option>
+    </select>
+    <input type="month" id="filterMonth">
+  </div>
+  <div id="listContainer"></div>
+</div>
+
+<!-- ② NGのみタブ -->
+<div class="tab-panel" id="tab-ng">
+  <div id="ngContainer"></div>
+</div>
+
+<!-- ③ 日別集計タブ -->
+<div class="tab-panel" id="tab-agg">
+  <div class="section-card">
+    <div class="section-body" style="padding:0">
+      <table class="agg-table">
+        <thead>
+          <tr>
+            <th>日付</th>
+            <th>件数</th>
+            <th>NG</th>
+            <th>アルコール</th>
+          </tr>
+        </thead>
+        <tbody id="aggBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ④ 出力タブ -->
+<div class="tab-panel" id="tab-export">
+  <div class="section-card">
+    <div class="section-body">
+      <div class="field-group">
+        <label>期間指定</label>
+        <div class="field-row">
+          <div class="field-group">
+            <label for="csvFrom">開始日</label>
+            <input type="date" id="csvFrom">
+          </div>
+          <div class="field-group">
+            <label for="csvTo">終了日</label>
+            <input type="date" id="csvTo">
+          </div>
+        </div>
+      </div>
+      <div class="field-group">
+        <label>出力対象</label>
+        <select id="csvFilter">
+          <option value="all">全件</option>
+          <option value="ng">NGあり のみ</option>
+        </select>
+      </div>
+      <button class="btn-csv" id="csvBtn">📥 CSV ダウンロード</button>
+      <p class="text-sub" style="font-size:0.78rem;text-align:center;margin-top:8px">
+        BOM付きUTF-8形式 (Excel対応)
+      </p>
+    </div>
+  </div>
+  <div class="section-card">
+    <div class="section-body">
+      <p class="text-sub" style="font-size:0.82rem;margin-bottom:8px">⚠️ データ管理</p>
+      <button class="btn-csv" id="deleteAllBtn"
+              style="border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,0.1)">
+        🗑️ 全データ削除
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-sheet" id="modalSheet">
+    <div id="modalContent"></div>
+    <button class="modal-close" id="modalClose">閉じる</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="history.js"></script>
+</body>
+</html>
