@@ -99,7 +99,8 @@ body {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  overflow: hidden;
+  /* スマホ特有の選択バグ(backdrop-filter + overflow:hidden)を回避するため無効化 */
+  /* overflow: hidden; */
 }
 .section-header {
   display: flex;
@@ -108,6 +109,8 @@ body {
   padding: 14px 18px;
   background: rgba(255,255,255,0.04);
   border-bottom: 1px solid var(--glass-border);
+  border-top-left-radius: calc(var(--radius) - 1px);
+  border-top-right-radius: calc(var(--radius) - 1px);
 }
 .section-icon {
   font-size: 1.3rem;

@@ -91,17 +91,21 @@
         <label for="odoStart">出発時 走行距離 (km)</label>
         <div class="odo-row">
           <input type="number" id="odoStart" inputmode="numeric" placeholder="0" min="0">
-          <button class="btn-camera" id="btnCameraStart" type="button" title="カメラでOCR読取">📷</button>
+          <label class="btn-camera" title="カメラでOCR読取">
+            📷
+            <input type="file" id="cameraStart" accept="image/*" capture="environment" style="display:none">
+          </label>
         </div>
-        <input type="file" id="cameraStart" accept="image/*" capture="environment" style="display:none">
       </div>
       <div class="field-group">
         <label for="odoEnd">帰着時 走行距離 (km)</label>
         <div class="odo-row">
           <input type="number" id="odoEnd" inputmode="numeric" placeholder="0" min="0">
-          <button class="btn-camera" id="btnCameraEnd" type="button" title="カメラでOCR読取">📷</button>
+          <label class="btn-camera" title="カメラでOCR読取">
+            📷
+            <input type="file" id="cameraEnd" accept="image/*" capture="environment" style="display:none">
+          </label>
         </div>
-        <input type="file" id="cameraEnd" accept="image/*" capture="environment" style="display:none">
       </div>
       <div class="field-group">
         <label>走行距離（自動計算）</label>

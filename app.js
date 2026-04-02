@@ -427,9 +427,7 @@ async function init() {
   $('driverCustom').addEventListener('input', updateProgress);
   $('checkerCustom').addEventListener('input', updateProgress);
 
-  // カメラOCRボタン
-  $('btnCameraStart').addEventListener('click', () => $('cameraStart').click());
-  $('btnCameraEnd').addEventListener('click',   () => $('cameraEnd').click());
+  // カメラOCRイベント（HTML側でネイティブ起動するため、changeイベントのみリッスン）
   $('cameraStart').addEventListener('change', e => {
     if (e.target.files[0]) runOcr(e.target.files[0], 'odoStart');
   });
