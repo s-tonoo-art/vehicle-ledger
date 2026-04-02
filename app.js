@@ -271,7 +271,7 @@ function validate() {
 }
 
 // ── 保存 ──
-function saveRecord() {
+async function saveRecord() {
   const errors = validate();
   if (errors.length > 0) {
     showToast('⚠️ ' + errors[0], 'error');
@@ -322,7 +322,24 @@ function saveRecord() {
   records.push(record);
   saveRecords(records);
 
-  showToast('✅ 点検記録を保存しました！', 'success');
+  // ▼ 新規追加: Google Apps Script経由でスプレッドシートへ送信
+  const btn = $('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '🔄 送信中...';
+  
+  try {
+    // 💡 Content-Type: text/plain で送信し、CORSのPreflightエラーを回避する
+    await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(record)
+    });
+    showToast('✅ スプレッドシートにも保存しました！', 'success');
+  } catch (err) {
+    console.error('GAS POST Error:', err);
+    showToast('⚠️ ネットワークエラーのため端末内にのみ保存しました', 'error');
+  }
+
   setTimeout(() => { window.location.href = 'history.html'; }, 1200);
 }
 
