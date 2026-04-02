@@ -369,15 +369,35 @@ async function runOcr(imageFile, targetInputId) {
   }
 }
 
+// ── Google Sheets連携 ──
+const GAS_URL = 'https://script.google.com/a/macros/jt-e.jp/s/AKfycbzOZlcXWtvMJiveI-Ou950AkCknmyeMmTsaPfmEzixDLX5zCZkndIK6OCGB5-ITMUHU/exec';
+
+async function loadMasterFromSheets() {
+  try {
+    const res  = await fetch(GAS_URL);
+    const data = await res.json();
+    const master = loadMaster();         // ローカルをベースに
+    if (data.branches) master.branches = data.branches;
+    if (data.vehicles) master.vehicles = data.vehicles;
+    if (data.drivers)  master.drivers  = data.drivers;
+    if (data.checkers) master.checkers = data.checkers;
+    saveMaster(master);                  // ローカルに上書き保存
+    return master;
+  } catch (e) {
+    console.warn('Sheets 読込み失敗、ローカルデータを使用:', e);
+    return loadMaster();
+  }
+}
+
 // ── 初期化 ──
-function init() {
+async function init() {
   // 日付セット
   const today = new Date();
   const pad = n => String(n).padStart(2, '0');
   $('date').value = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
 
   // マスターからセレクト構築
-  const master = loadMaster();
+  const master = await loadMasterFromSheets();
   buildSelect($('branch'),   master.branches);
   buildSelect($('vehicle'),  master.vehicles);
   buildSelect($('driver'),   master.drivers);
