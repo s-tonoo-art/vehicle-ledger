@@ -39,16 +39,20 @@ function saveRecords(records) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
 }
 function loadMaster() {
-  try {
-    const m = JSON.parse(localStorage.getItem(MASTER_KEY));
-    if (m) return m;
-  } catch {}
-  return {
+  const defaultMaster = {
     branches: [...MASTER.branches],
     vehicles: [...MASTER.vehicles],
     drivers:  [...MASTER.drivers],
     checkers: [...MASTER.checkers],
   };
+  try {
+    const m = JSON.parse(localStorage.getItem(MASTER_KEY));
+    // localStorageが空オブジェクトや壊れている場合はデフォルトを返す
+    if (m && Array.isArray(m.branches) && Array.isArray(m.vehicles)) {
+      return m;
+    }
+  } catch {}
+  return defaultMaster;
 }
 function saveMaster(m) {
   localStorage.setItem(MASTER_KEY, JSON.stringify(m));
@@ -60,6 +64,7 @@ const $ = id => document.getElementById(id);
 // ── セレクト生成 ──
 function buildSelect(selectEl, items, allowCustom) {
   selectEl.innerHTML = '<option value="">-- 選択してください --</option>';
+  if (!Array.isArray(items)) return; // 壊れたデータが来た場合のエラー停止を防止
   items.forEach(item => {
     const opt = document.createElement('option');
     opt.value = item;
