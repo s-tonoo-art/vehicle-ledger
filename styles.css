@@ -94,13 +94,16 @@ body {
 /* ── Section Card ── */
 .section-card {
   background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  /* スマホのselectタップバグ（backdrop-filter起因）を避けるため無効化 */
+  /* backdrop-filter: blur(16px); */
+  /* -webkit-backdrop-filter: blur(16px); */
   border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   /* スマホ特有の選択バグ(backdrop-filter + overflow:hidden)を回避するため無効化 */
   /* overflow: hidden; */
+  /* iOSでの要素重なり抜けを防止 */
+  transform: translateZ(0);
 }
 .section-header {
   display: flex;
