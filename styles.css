@@ -157,8 +157,17 @@ body {
   padding: 12px 14px;
   width: 100%;
   transition: border-color var(--transition), box-shadow var(--transition);
+}
+.field-group input,
+.field-group textarea {
   -webkit-appearance: none;
   appearance: none;
+}
+.field-group select {
+  /* スマホでのネイティブ動作・UIを保つため追加 */
+  -webkit-appearance: auto;
+  appearance: auto;
+  cursor: pointer;
 }
 .field-group input:focus,
 .field-group select:focus,
