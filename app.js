@@ -14,15 +14,15 @@ const MASTER = {
 };
 
 const CHECK_ITEMS = [
-  { key: 'brake',    label: 'ブレーキ',      icon: '$D83D$DED1' },
-  { key: 'tire',     label: 'タイヤ状態',    icon: '$D83D$DD04' },
-  { key: 'lights',   label: '灯火類',        icon: '$D83D$DCA1' },
-  { key: 'wiper',    label: 'ワイパー',      icon: '$D83C$DF27$FE0F' },
-  { key: 'mirror',   label: 'バックミラー',  icon: '$D83E$DE9E' },
-  { key: 'engine',   label: 'エンジン始動',  icon: '$D83D$DD27' },
-  { key: 'noise',    label: '異音有無',      icon: '$D83D$DD0A' },
-  { key: 'fuel',     label: '燃料残量',      icon: '$26FD' },
-  { key: 'other',    label: 'その他',        icon: '$D83D$DCDD' },
+  { key: 'brake',    label: 'ブレーキ',      icon: '🛑' },
+  { key: 'tire',     label: 'タイヤ状態',    icon: '🔄' },
+  { key: 'lights',   label: '灯火類',        icon: '💡' },
+  { key: 'wiper',    label: 'ワイパー',      icon: '🌧️' },
+  { key: 'mirror',   label: 'バックミラー',  icon: '🪞' },
+  { key: 'engine',   label: 'エンジン始動',  icon: '🔧' },
+  { key: 'noise',    label: '異音有無',      icon: '🔊' },
+  { key: 'fuel',     label: '燃料残量',      icon: '⛽' },
+  { key: 'other',    label: 'その他',        icon: '📝' },
 ];
 
 const TOTAL_SECTIONS = 5;
@@ -92,12 +92,12 @@ function buildCheckList() {
     card.innerHTML = `
       <div class="check-item-name">${item.icon} ${item.label}</div>
       <div class="check-buttons">
-        <button class="btn-check" data-key="${item.key}" data-val="ok"   id="btn-${item.key}-ok">$2705 OK</button>
-        <button class="btn-check" data-key="${item.key}" data-val="ng"   id="btn-${item.key}-ng">$274C NG</button>
-        <button class="btn-check" data-key="${item.key}" data-val="skip" id="btn-${item.key}-skip">$2014 未実施</button>
+        <button class="btn-check" data-key="${item.key}" data-val="ok"   id="btn-${item.key}-ok">✅ OK</button>
+        <button class="btn-check" data-key="${item.key}" data-val="ng"   id="btn-${item.key}-ng">❌ NG</button>
+        <button class="btn-check" data-key="${item.key}" data-val="skip" id="btn-${item.key}-skip">— 未実施</button>
       </div>
       <div class="ng-comment" id="ngComment-${item.key}">
-        <label>$26A0$FE0F NG理由（必須）</label>
+        <label>⚠️ NG理由（必須）</label>
         <textarea id="ngText-${item.key}" placeholder="${item.label}のNG内容を入力してください"></textarea>
       </div>
     `;
@@ -282,7 +282,7 @@ function validate() {
 async function saveRecord() {
   const errors = validate();
   if (errors.length > 0) {
-    showToast('$26A0$FE0F ' + errors[0], 'error');
+    showToast('⚠️ ' + errors[0], 'error');
     return;
   }
 
@@ -346,20 +346,20 @@ async function saveRecord() {
   // ▼ 新規追加: Google Apps Script経由でスプレッドシートへ送信
   const btn = $('submitBtn');
   btn.disabled = true;
- btn.textContent = '?? 送信中...';
+  btn.textContent = '🔄 送信中...';
   
   try {
-    // $D83D$DCA1 Content-Type: text/plain で送信し、CORSのPreflightエラーを回避する
+    // 💡 Content-Type: text/plain で送信し、CORSのPreflightエラーを回避する
     const payload = { action: isUpdate ? 'update' : 'create', data: record };
     await fetch(GAS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(payload)
     });
-    showToast('$2705 スプレッドシートにも保存しました！', 'success');
+    showToast('✅ スプレッドシートにも保存しました！', 'success');
   } catch (err) {
     console.error('GAS POST Error:', err);
-    showToast('$26A0$FE0F ネットワークエラーのため端末内にのみ保存しました', 'error');
+    showToast('⚠️ ネットワークエラーのため端末内にのみ保存しました', 'error');
   }
 
   setTimeout(() => { window.location.href = 'history.html'; }, 1200);
@@ -419,23 +419,24 @@ async function runOcr(imageFile, targetInputId) {
   } catch (err) {
     console.error('OCR error:', err);
     showToast('$26A0$FE0F OCRエラー。手動入力してください。', 'error');
+    showToast('⚠️ OCRエラー。手動入力してください。', 'error');
   } finally {
     showOcrLoading(false);
   }
 }
 
 // ── Google Sheets連携 ──
-/ 420行目：URLを確認（末尾にキャッシュ対策を追加）
+// URLを確認（末尾にキャッシュ対策を追加）
 const GAS_URL = 'https://script.google.com/a/macros/jt-e.jp/s/AKfycbxKCtNSP0fonFnIBjs3BUCoKcYtiFsw2ohXQHqFGi0UgHohrEm6seV4luG2BnCv-SHc/exec';
+
 async function loadMasterFromSheets() {
-  console.log('?? GASからマスターデータを取得開始...');
+  console.log('📡 GASからマスターデータを取得開始...');
   try {
-    // ?? キャッシュ対策としてURLの末尾に時間を付与
     const res  = await fetch(GAS_URL + '?t=' + Date.now());
     if (!res.ok) throw new Error('Network response was not ok');
     
     const data = await res.json();
-    console.log('? GASからの取得に成功:', data);
+    console.log('✅ GASからの取得に成功:', data);
     
     const master = loadMaster();
     if (data.branches && data.branches.length > 0) master.branches = data.branches;
@@ -446,8 +447,65 @@ async function loadMasterFromSheets() {
     saveMaster(master);
     return master;
   } catch (e) {
-    console.error('? GASの読み込みに失敗しました。ローカルデータを使用します:', e);
+    console.error('❌ GASの読み込みに失敗しました:', e);
+    showToast('⚠️ 連携失敗: 接続状況を確認してください', 'error');
     return loadMaster();
+  }
+}
+
+// ── 接続テスト（詳細診断） ──
+async function runDiagnostic() {
+  const statusEl = $('diagnosticStatus');
+  const logEl    = $('diagnosticLog');
+  const btn      = $('testConnBtn');
+  
+  statusEl.textContent = '⏳ 診断中...';
+  statusEl.className = 'diagnostic-status';
+  logEl.style.display = 'block';
+  logEl.textContent = `[${new Date().toLocaleTimeString()}] 診断開始...\n`;
+  logEl.textContent += `URL: ${GAS_URL}\n`;
+  btn.disabled = true;
+
+  try {
+    logEl.textContent += `> Fetch実行中...\n`;
+    const start = Date.now();
+    const res = await fetch(GAS_URL + '?diagnostic=' + start);
+    const end = Date.now();
+    
+    logEl.textContent += `> レスポンス受信: ${res.status} ${res.statusText} (${end - start}ms)\n`;
+    
+    if (res.ok) {
+      const data = await res.json();
+      logEl.textContent += `> JSONパース成功:\n${JSON.stringify(data, null, 2)}\n`;
+      statusEl.textContent = '✅ 接続成功！';
+      statusEl.classList.add('status-ok');
+      showToast('✅ 正常に通信できています', 'success');
+    } else {
+      statusEl.textContent = `❌ エラー (${res.status})`;
+      statusEl.classList.add('status-error');
+      logEl.textContent += `> エラー詳細: ${res.status} ${res.statusText}\n`;
+      if (res.status === 401) {
+        logEl.textContent += `💡 ヒント: Googleアカウントの認証が必要か、アクセス権限が不足しています。\n`;
+      }
+    }
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = '❌ 接続失敗';
+    statusEl.classList.add('status-error');
+    logEl.textContent += `> エラー発生: ${err.name}\n`;
+    logEl.textContent += `> メッセージ: ${err.message}\n`;
+    
+    if (err.message.includes('Failed to fetch')) {
+      logEl.textContent += `\n🚨 【重要】CORSエラーまたはネットワーク遮断が発生しています。\n`;
+      logEl.textContent += `考えられる原因:\n`;
+      logEl.textContent += `1. GASの公開設定が「全員(Anyone)」になっていないため、リダイレクト先の認証でブラウザに拒否されている。\n`;
+      logEl.textContent += `2. 社内プロキシやセキュリティソフトで script.google.com が制限されている。\n`;
+      logEl.textContent += `\n💡 対策案:\n`;
+      logEl.textContent += `・可能であれば、GASの公開設定を「全員(Anyone)」に変更して再デプロイしてください。\n`;
+    }
+  } finally {
+    btn.disabled = false;
+    logEl.textContent += `\n[${new Date().toLocaleTimeString()}] 診断終了。`;
   }
 }
 
@@ -527,6 +585,7 @@ async function init() {
   });
 
   $('submitBtn').addEventListener('click', saveRecord);
+  $('testConnBtn').addEventListener('click', runDiagnostic);
 
   // Updateモードの判定（履歴から再入力に来た場合）
   const updateId = sessionStorage.getItem('updateRecordId');

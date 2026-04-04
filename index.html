@@ -174,8 +174,18 @@
     </div>
   </div>
 
-  <!-- Submit -->
-  <button class="btn-submit" id="submitBtn">💾 点検記録を保存する</button>
+  <!-- Connection Diagnostic -->
+  <div class="section-card diagnostic-section" id="sec-diagnostic">
+    <div class="section-header">
+      <div class="section-icon">📡</div>
+      <div class="section-title">接続診断（スプレッドシート連携）</div>
+    </div>
+    <div class="section-body">
+      <div id="diagnosticStatus" class="diagnostic-status">未実施</div>
+      <button class="btn-secondary" id="testConnBtn">🌐 連携テストを実行</button>
+      <div id="diagnosticLog" class="diagnostic-log" style="display:none"></div>
+    </div>
+  </div>
 
 </div>
 

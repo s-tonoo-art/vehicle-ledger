@@ -676,6 +676,47 @@ body {
 .font-bold { font-weight: 700; }
 .mt-2 { margin-top: 8px; }
 
+/* ── Diagnostic UI ── */
+.diagnostic-section {
+  margin-top: 10px;
+  background: rgba(108,99,255,0.05);
+}
+.btn-secondary {
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--primary);
+  background: transparent;
+  color: var(--primary);
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-secondary:active { transform: scale(0.98); background: rgba(108,99,255,0.1); }
+.diagnostic-status {
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: center;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+.diagnostic-log {
+  background: #000;
+  color: #33ff33;
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 15px;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  border: 1px solid #333;
+}
+.status-ok    { color: var(--ok-color); }
+.status-error { color: var(--ng-color); }
+
 @media (max-width: 360px) {
   .btn-check { font-size: 0.78rem; padding: 9px 0; }
   .section-body { padding: 12px 14px; }
