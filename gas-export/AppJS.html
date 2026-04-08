@@ -1,0 +1,400 @@
+<script>
+/* ==============================================
+   車両点検アプリ - AppJS.html
+   メインロジック（LocalStorage + GAS通信）
+   ============================================== */
+
+'use strict';
+
+// ── 設定 ──
+const CHECK_ITEMS = [
+  { key: 'brake',    label: 'ブレーキ',      icon: '\uD83D\uDED1' },
+  { key: 'tire',     label: 'タイヤ状態',    icon: '\uD83D\uDD04' },
+  { key: 'lights',   label: '灯火類',        icon: '\uD83D\uDCA1' },
+  { key: 'wiper',    label: 'ワイパー',      icon: '\uD83C\uDF27' },
+  { key: 'mirror',   label: 'バックミラー',  icon: '\uD83E\uDE9E' },
+  { key: 'engine',   label: 'エンジン始動',  icon: '\uD83D\uDD27' },
+  { key: 'noise',    label: '異音有無',      icon: '\uD83D\uDD0A' },
+  { key: 'fuel',     label: '燃料残量',      icon: '\u26FD' },
+  { key: 'other',    label: 'その他',        icon: '\uD83D\uDCDD' },
+];
+
+const TOTAL_SECTIONS = 5;
+const ALCOHOL_THRESHOLD = 0.15;
+const STORAGE_KEY = 'vehicle_inspections_v1';
+const MASTER_KEY  = 'vehicle_master_v1';
+
+// ── ストレージ ──
+function loadRecords() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { return []; }
+}
+function saveRecords(records) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+}
+function loadMaster() {
+  try {
+    const m = JSON.parse(localStorage.getItem(MASTER_KEY));
+    if (m && Array.isArray(m.branches)) return m;
+  } catch {}
+  return { branches: [], vehicles: [], drivers: [], checkers: [] };
+}
+function saveMaster(m) {
+  localStorage.setItem(MASTER_KEY, JSON.stringify(m));
+}
+
+// ── DOM 取得ヘルパー ──
+const $ = id => document.getElementById(id);
+
+// ── セレクト生成 ──
+function buildSelect(selectEl, items) {
+  selectEl.innerHTML = '<option value="">-- 選択してください --</option>';
+  if (!items || !Array.isArray(items)) return;
+  
+  items.forEach(item => {
+    if (item === 'その他（手入力）') return; 
+    const opt = document.createElement('option');
+    opt.value = opt.textContent = item;
+    selectEl.appendChild(opt);
+  });
+  
+  const other = document.createElement('option');
+  other.value = other.textContent = 'その他（手入力）';
+  selectEl.appendChild(other);
+}
+
+// ── 点検カード生成 ──
+function buildCheckList() {
+  const container = $('checkList');
+  container.innerHTML = '';
+  CHECK_ITEMS.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'check-card';
+    card.id = `card-${item.key}`;
+    card.innerHTML = `
+      <div class="check-item-name">${item.icon} ${item.label}</div>
+      <div class="check-buttons">
+        <button class="btn-check" data-key="${item.key}" data-val="ok"   id="btn-${item.key}-ok">\u2705 OK</button>
+        <button class="btn-check" data-key="${item.key}" data-val="ng"   id="btn-${item.key}-ng">\u274C NG</button>
+        <button class="btn-check" data-key="${item.key}" data-val="skip" id="btn-${item.key}-skip">\u2014 未実施</button>
+      </div>
+      <div class="ng-comment" id="ngComment-${item.key}">
+        <label>\u26A0 NG理由（必須）</label>
+        <textarea id="ngText-${item.key}" placeholder="${item.label}のNG内容を入力してください"></textarea>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  container.addEventListener('click', e => {
+    const btn = e.target.closest('.btn-check');
+    if (!btn) return;
+    const { key, val } = btn.dataset;
+    setCheckState(key, val);
+  });
+}
+
+const checkState = {};
+
+function setCheckState(key, val) {
+  checkState[key] = val;
+  const card   = $(`card-${key}`);
+  const btnOk   = $(`btn-${key}-ok`);
+  const btnNg   = $(`btn-${key}-ng`);
+  const btnSkip = $(`btn-${key}-skip`);
+  const comment = $(`ngComment-${key}`);
+
+  [btnOk, btnNg, btnSkip].forEach(b => b.className = 'btn-check');
+  card.classList.remove('is-ok', 'is-ng');
+  comment.classList.remove('visible');
+
+  if (val === 'ok') {
+    btnOk.classList.add('active-ok');
+    card.classList.add('is-ok');
+  } else if (val === 'ng') {
+    btnNg.classList.add('active-ng');
+    card.classList.add('is-ng');
+    comment.classList.add('visible');
+    $(`ngText-${key}`).focus();
+  } else if (val === 'skip') {
+    btnSkip.classList.add('active-skip');
+  }
+  updateProgress();
+}
+
+// ── 走行距離計算 ──
+function updateOdo() {
+  const start = parseFloat($('odoStart').value) || 0;
+  const end   = parseFloat($('odoEnd').value)   || 0;
+  const diff  = end - start;
+  $('odoCalc').value = diff >= 0 ? `${diff.toLocaleString()} km` : '--- km';
+  updateProgress();
+}
+
+// ── アルコールチェック ──
+function updateAlcohol() {
+  const val = parseFloat($('alcoholVal').value);
+  const warn = $('alcoholWarning');
+  if (!isNaN(val) && val >= ALCOHOL_THRESHOLD) {
+    warn.classList.add('visible');
+  } else {
+    warn.classList.remove('visible');
+  }
+  updateProgress();
+}
+
+// ── プログレス ──
+function updateProgress() {
+  let done = 0;
+  if (getVehicle() && getDriver()) done++;
+  if ($('odoStart').value !== '') done++;
+  if (CHECK_ITEMS.every(i => checkState[i.key])) done++;
+  if ($('alcoholVal').value !== '') done++;
+  if (getChecker()) done++;
+
+  const pct = Math.round((done / TOTAL_SECTIONS) * 100);
+  $('progressFill').style.width = `${pct}%`;
+  $('progressLabel').textContent = `${done} / ${TOTAL_SECTIONS} セクション完了`;
+}
+
+// ── 値取得 ──
+function getValue(selId, customId) {
+  const v = $(selId).value;
+  return v === 'その他（手入力）' ? $(customId).value.trim() : v;
+}
+const getBranch = () => getValue('branch', 'branchCustom');
+const getVehicle = () => getValue('vehicle', 'vehicleCustom');
+const getDriver = () => getValue('driver', 'driverCustom');
+const getChecker = () => getValue('checker', 'checkerCustom');
+
+// ── バリデーション ──
+function validate() {
+  const errors = [];
+  if (!getBranch())   errors.push('支店名を選択または入力してください。');
+  if (!getVehicle())  errors.push('車両番号を選択または入力してください。');
+  if (!getDriver())   errors.push('運転者名を選択または入力してください。');
+  if (!$('departure').value) errors.push('出発時刻を入力してください。');
+  if ($('odoStart').value === '') errors.push('出発時走行距離を入力してください。');
+  CHECK_ITEMS.forEach(item => {
+    if (!checkState[item.key]) errors.push(`「${item.label}」の点検結果を選択してください。`);
+    if (checkState[item.key] === 'ng' && !$(`ngText-${item.key}`).value.trim()) {
+      errors.push(`「${item.label}」のNG理由を入力してください。`);
+    }
+  });
+  if ($('alcoholVal').value === '') errors.push('アルコール検査値を入力してください。');
+  if (!getChecker()) errors.push('確認者名を選択または入力してください。');
+  return errors;
+}
+
+// ── 保存 ──
+function saveRecord() {
+  const errors = validate();
+  if (errors.length > 0) {
+    showToast('\u26A0 ' + errors[0], 'error');
+    return;
+  }
+
+  const alcohol = parseFloat($('alcoholVal').value) || 0;
+  const checks  = {};
+  CHECK_ITEMS.forEach(item => {
+    checks[item.key] = {
+      label:   item.label,
+      result:  checkState[item.key],
+      comment: checkState[item.key] === 'ng' ? $(`ngText-${item.key}`).value.trim() : '',
+    };
+  });
+
+  const record = {
+    id:        sessionStorage.getItem('updateRecordId') || Date.now().toString(),
+    savedAt:   new Date().toISOString(),
+    date:      $('date').value,
+    branch:    getBranch(),
+    vehicle:   getVehicle(),
+    driver:    getDriver(),
+    departure: $('departure').value,
+    arrival:   $('arrival').value,
+    odoStart:  parseFloat($('odoStart').value) || 0,
+    odoEnd:    parseFloat($('odoEnd').value)   || 0,
+    odoDiff:   (parseFloat($('odoEnd').value) || 0) - (parseFloat($('odoStart').value) || 0),
+    checks,
+    alcohol,
+    alcoholAlert: alcohol >= ALCOHOL_THRESHOLD,
+    checker:   getChecker(),
+    checkedAt: $('checkedAt').value,
+    remarks:   $('remarks').value.trim(),
+    status:    $('arrival').value && $('odoEnd').value ? '完了' : '稼働中',
+  };
+
+  // LocalStorageに保存
+  const records = loadRecords();
+  const isUpdate = sessionStorage.getItem('updateRecordId');
+  if (isUpdate) {
+    const idx = records.findIndex(r => r.id === isUpdate);
+    if (idx !== -1) records[idx] = record;
+    sessionStorage.removeItem('updateRecordId');
+  } else {
+    records.push(record);
+  }
+  saveRecords(records);
+
+  // GASサーバーへ送信
+  const btn = $('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '\uD83D\uDD04 送信中...';
+
+  google.script.run
+    .withSuccessHandler(() => {
+      showToast('\u2705 保存完了しました！', 'success');
+      setTimeout(() => {
+        location.href = '<?= ScriptApp.getService().getUrl(); ?>?p=history';
+      }, 1000);
+    })
+    .withFailureHandler((err) => {
+      console.error(err);
+      showToast('\u26A0 通信エラー（端末にのみ保存しました）', 'error');
+      btn.disabled = false;
+      btn.textContent = '送信';
+    })
+    .saveRecordGAS({ action: isUpdate ? 'update' : 'create', data: record });
+}
+
+// ── トースト ──
+function showToast(msg, type = '') {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+
+// ── 初期化 ──
+function init() {
+  const today = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  $('date').value = `${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+
+  // 1. ローカルから一旦構築
+  const localMaster = loadMaster();
+  if (localMaster.branches.length > 0) {
+    applyMaster(localMaster);
+  }
+
+  // 2. サーバーから最新マスター取得
+  google.script.run
+    .withSuccessHandler(data => {
+      if (data && !data.error) {
+        saveMaster(data);
+        applyMaster(data);
+      }
+    })
+    .getMasterDataGAS();
+
+  buildCheckList();
+
+  // イベント
+  $('odoStart').addEventListener('input', updateOdo);
+  $('odoEnd').addEventListener('input',   updateOdo);
+  $('alcoholVal').addEventListener('input', updateAlcohol);
+  
+  [['branch','branchCustomWrap'], ['vehicle','vehicleCustomWrap'], ['driver','driverCustomWrap'], ['checker','checkerCustomWrap']].forEach(([sel, wrap]) => {
+    $(sel).addEventListener('change', () => {
+      $(wrap).style.display = $(sel).value === 'その他（手入力）' ? '' : 'none';
+      updateProgress();
+    });
+  });
+
+  document.querySelectorAll('input, select, textarea').forEach(el => {
+    el.addEventListener('change', updateProgress);
+    el.addEventListener('input', updateProgress);
+  });
+
+  $('cameraStart').addEventListener('change', e => { if (e.target.files[0]) runOcr(e.target.files[0], 'odoStart'); });
+  $('cameraEnd').addEventListener('change', e => { if (e.target.files[0]) runOcr(e.target.files[0], 'odoEnd'); });
+
+  $('submitBtn').addEventListener('click', saveRecord);
+
+  // 再開（更新）モード
+  const updateId = sessionStorage.getItem('updateRecordId');
+  if (updateId) {
+    const target = loadRecords().find(r => r.id === updateId);
+    if (target) restoreRecord(target);
+  } else {
+    // 前回データ引継ぎ
+    const recs = loadRecords();
+    if (recs.length > 0) {
+      const last = recs[recs.length - 1];
+      if (last.odoEnd) { $('odoStart').value = last.odoEnd; updateOdo(); }
+    }
+  }
+}
+
+function applyMaster(m) {
+  buildSelect($('branch'),  m.branches);
+  buildSelect($('vehicle'), m.vehicles);
+  buildSelect($('driver'),  m.drivers);
+  buildSelect($('checker'), m.checkers);
+}
+
+function restoreRecord(r) {
+  $('date').value = r.date;
+  const setVal = (selId, val, wrapId) => {
+    const sel = $(selId);
+    let found = false;
+    for (let i=0; i<sel.options.length; i++) {
+      if (sel.options[i].value === val) { sel.selectedIndex = i; found = true; break; }
+    }
+    if (!found && val) {
+      sel.value = 'その他（手入力）';
+      $(selId + 'Custom').value = val;
+      $(wrapId).style.display = '';
+    }
+  };
+  setVal('branch', r.branch, 'branchCustomWrap');
+  setVal('vehicle', r.vehicle, 'vehicleCustomWrap');
+  setVal('driver', r.driver, 'driverCustomWrap');
+  setVal('checker', r.checker, 'checkerCustomWrap');
+
+  $('departure').value = r.departure || '';
+  $('arrival').value = r.arrival || '';
+  $('odoStart').value = r.odoStart || '';
+  $('odoEnd').value = r.odoEnd || '';
+  $('alcoholVal').value = r.alcohol || '';
+  $('remarks').value = r.remarks || '';
+  
+  if (r.checks) {
+    Object.keys(r.checks).forEach(k => {
+      setCheckState(k, r.checks[k].result);
+      if (r.checks[k].result === 'ng') $(`ngText-${k}`).value = r.checks[k].comment;
+    });
+  }
+  updateOdo();
+  updateAlcohol();
+  updateProgress();
+  $('submitBtn').textContent = '更新して送信';
+}
+
+// ── OCR ──
+async function runOcr(file, targetId) {
+  $('ocrOverlay').style.display = 'flex';
+  try {
+    const worker = await Tesseract.createWorker('eng');
+    await worker.setParameters({ tessedit_char_whitelist: '0123456789' });
+    const { data: { text } } = await worker.recognize(file);
+    await worker.terminate();
+    const matches = text.match(/\d+/g);
+    if (matches) {
+       const val = matches.reduce((a,b) => a.length >= b.length ? a : b);
+       $(targetId).value = val;
+       updateOdo();
+       showToast(`\uD83D\uDCF7 OCR読取: ${val} km`, 'success');
+    } else {
+       showToast('\u26A0 数値を読取できませんでした', 'error');
+    }
+  } catch (e) {
+    showToast('\u26A0 OCRエラー', 'error');
+  } finally {
+    $('ocrOverlay').style.display = 'none';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>

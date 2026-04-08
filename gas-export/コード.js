@@ -1,4 +1,4 @@
-const APP_TARGET_SHEET_ID = '1rN5oDCZ9wRPxTRr-oATTDUKyD5vXz504TaSIZx4je5w'; 
+const SHEET_ID = '1rN5oDCZ9wRPxTRr-oATTDUKyD5vXz504TaSIZx4je5w'; // お客様のシステムシートID
 
 /**
  * GETリクエスト: HTMLを返す
@@ -36,7 +36,7 @@ function getMasterDataGAS() {
  */
 function saveRecordGAS(payload) {
   try {
-    const ss = SpreadsheetApp.openById(APP_TARGET_SHEET_ID);
+    const ss = SpreadsheetApp.openById(SHEET_ID);
     let sheet = ss.getSheetByName('records');
     if (!sheet) {
       sheet = ss.insertSheet('records');
@@ -73,7 +73,7 @@ function saveRecordGAS(payload) {
  */
 function getRecordsGAS() {
   try {
-    const ss = SpreadsheetApp.openById(APP_TARGET_SHEET_ID);
+    const ss = SpreadsheetApp.openById(SHEET_ID);
     const sheet = ss.getSheetByName('records');
     if (!sheet) return [];
     
@@ -128,7 +128,7 @@ function formatDate(date) {
  * スプレッドシートからマスターデータを読み込む (内部用)
  */
 function getMasterData() {
-  const ss = SpreadsheetApp.openById(APP_TARGET_SHEET_ID);
+  const ss = SpreadsheetApp.openById(SHEET_ID);
   const sheetNames = ['master', 'Master', 'マスター', 'MasterData'];
   let sheet = null;
   for (const name of sheetNames) {

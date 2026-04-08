@@ -1,0 +1,214 @@
+<script>
+/* ==============================================
+   車両点検アプリ - HistoryJS.html
+   履歴ロジック（GASデータ優先 + LocalStorage同期）
+   ============================================== */
+
+'use strict';
+
+const STORAGE_KEY = 'vehicle_inspections_v1';
+const CHECK_LABELS = {
+  brake:  'ブレーキ',
+  tire:   'タイヤ状態',
+  lights: '灯火類',
+  wiper:  'ワイパー',
+  mirror: 'バックミラー',
+  engine: 'エンジン始動',
+  noise:  '異音有無',
+  fuel:   '燃料残量',
+  other:  'その他',
+};
+
+const $ = id => document.getElementById(id);
+
+let ALL_RECORDS = [];
+
+// ── データ読み込み ──
+function loadLocalRecords() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { return []; }
+}
+
+function fetchServerRecords() {
+  google.script.run
+    .withSuccessHandler(records => {
+      if (records && Array.isArray(records)) {
+        // サーバーから取得したデータで上書き（またはマージ）
+        ALL_RECORDS = records;
+        // LocalStorageも更新（最新状態を保持）
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+        refreshUI();
+      }
+    })
+    .getRecordsGAS();
+}
+
+function refreshUI() {
+  populateVehicleFilter();
+  renderList();
+  renderNg();
+  renderAgg();
+}
+
+// ── フィルタ・レンダラー ──
+function renderList() {
+  const container = $('listContainer');
+  container.innerHTML = '';
+
+  const vehicle = $('filterVehicle').value;
+  const month   = $('filterMonth').value;
+
+  const filtered = ALL_RECORDS.filter(r => {
+    if (vehicle && r.vehicle !== vehicle) return false;
+    if (month && !r.date?.startsWith(month)) return false;
+    return true;
+  }).reverse();
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div class="empty-state">該当する記録がありません</div>`;
+    return;
+  }
+  filtered.forEach(r => container.appendChild(createRecordCard(r)));
+}
+
+function renderNg() {
+  const container = $('ngContainer');
+  container.innerHTML = '';
+  const ngRecords = ALL_RECORDS.filter(r => {
+     return Object.values(r.checks || {}).some(c => c.result === 'ng');
+  }).reverse();
+  
+  if (ngRecords.length === 0) {
+    container.innerHTML = `<div class="empty-state">NGはありません</div>`;
+    return;
+  }
+  ngRecords.forEach(r => container.appendChild(createRecordCard(r)));
+}
+
+function renderAgg() {
+  const byDate = {};
+  ALL_RECORDS.forEach(r => {
+    const d = r.date || '不明';
+    if (!byDate[d]) byDate[d] = { count: 0, ng: 0, alcohol: 0 };
+    byDate[d].count++;
+    if (Object.values(r.checks || {}).some(c => c.result === 'ng')) byDate[d].ng++;
+    if (r.alcoholAlert) byDate[d].alcohol++;
+  });
+
+  const tbody = $('aggBody');
+  tbody.innerHTML = '';
+  Object.keys(byDate).sort().reverse().forEach(d => {
+    const agg = byDate[d];
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${d.replace(/-/g, '/')}</td>
+      <td>${agg.count}</td>
+      <td class="${agg.ng > 0 ? 'ng-cell' : ''}">${agg.ng}</td>
+      <td>${agg.alcohol > 0 ? '\u26A0' : '\u2014'}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+function createRecordCard(record) {
+  const div = document.createElement('div');
+  const hasNg = Object.values(record.checks || {}).some(c => c.result === 'ng');
+  div.className = `record-card ${hasNg ? 'has-ng' : ''}`;
+
+  const checks = Object.values(record.checks || {});
+  const okCnt = checks.filter(c => c.result === 'ok').length;
+  const ngCnt = checks.filter(c => c.result === 'ng').length;
+
+  div.innerHTML = `
+    <div class="record-card-top">
+      <span class="record-vehicle">${record.vehicle || '---'}</span>
+      <span class="record-date">${record.date || ''}</span>
+    </div>
+    <div class="record-driver">\uD83D\uDC64 ${record.driver || '---'}　${record.departure || '--:--'}発　${record.odoDiff || 0}km走行</div>
+    <div class="record-badges">
+      ${record.status === '完了' ? '<span class="badge" style="background:#10b981;color:white">\u2705 完了</span>' : '<span class="badge" style="background:#f59e0b;color:white">\uD83D\uDFE1 稼働中</span>'}
+      <span class="badge badge-ok">OK: ${okCnt}</span>
+      <span class="badge badge-ng">NG: ${ngCnt}</span>
+      ${record.alcoholAlert ? '<span class="badge badge-warn">\u26A0 ALC</span>' : ''}
+    </div>
+  `;
+  div.onclick = () => openModal(record);
+  return div;
+}
+
+function openModal(record) {
+  const content = $('modalContent');
+  let html = `
+    <h2 style="font-size:1rem;margin-bottom:16px;color:var(--primary)">\uD83D\uDCCB 点検詳細</h2>
+    <div class="modal-row"><span class="modal-key">日付</span><span class="modal-val">${record.date}</span></div>
+    <div class="modal-row"><span class="modal-key">車両</span><span class="modal-val">${record.vehicle}</span></div>
+    <div class="modal-row"><span class="modal-key">運転者</span><span class="modal-val">${record.driver}</span></div>
+    <div class="modal-row"><span class="modal-key">走行</span><span class="modal-val">${record.odoDiff} km</span></div>
+    <div style="margin:14px 0 6px;font-size:0.78rem;color:var(--text-sub);font-weight:700;">点検結果</div>
+  `;
+  
+  if (record.checks) {
+    Object.keys(record.checks).forEach(k => {
+      const c = record.checks[k];
+      const res = c.result === 'ok' ? '<span class="modal-val ok">OK</span>' : (c.result === 'ng' ? '<span class="modal-val ng">NG</span>' : '\u2014');
+      html += `<div class="modal-row"><span class="modal-key">${CHECK_LABELS[k] || k}</span><span class="modal-val">${res}</span></div>`;
+      if (c.comment) html += `<div style="text-align:right;font-size:0.8rem;color:var(--ng-color);margin-bottom:8px;">${c.comment}</div>`;
+    });
+  }
+
+  if (record.status === '稼働中') {
+    html += `
+      <div style="margin-top:20px;">
+        <button id="resumeBtn" class="btn-submit" style="font-size:0.9rem;padding:12px;">\uD83D\uDE97 帰着報告を入力する</button>
+      </div>
+    `;
+  }
+
+  content.innerHTML = html;
+  if ($('resumeBtn')) {
+    $('resumeBtn').onclick = () => {
+      sessionStorage.setItem('updateRecordId', record.id);
+      location.href = '<?= ScriptApp.getService().getUrl(); ?>?p=index';
+    };
+  }
+  $('modalOverlay').classList.add('open');
+}
+
+function populateVehicleFilter() {
+  const vehicles = [...new Set(ALL_RECORDS.map(r => r.vehicle).filter(Boolean))];
+  const sel = $('filterVehicle');
+  sel.innerHTML = '<option value="">全車両</option>';
+  vehicles.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    sel.appendChild(opt);
+  });
+}
+
+function init() {
+  // まずローカルデータを表示（即時性のため）
+  ALL_RECORDS = loadLocalRecords();
+  refreshUI();
+
+  // サーバーの最新データを取りに行く
+  fetchServerRecords();
+
+  // イベント
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.tab-btn, .tab-panel').forEach(el => el.classList.remove('active'));
+      btn.classList.add('active');
+      $(btn.dataset.tab).classList.add('active');
+    };
+  });
+
+  $('filterVehicle').onchange = renderList;
+  $('filterMonth').onchange = renderList;
+  $('modalClose').onclick = () => $('modalOverlay').classList.remove('open');
+  
+  const now = new Date();
+  $('filterMonth').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
